@@ -22,7 +22,7 @@ reasonable to take over the package selection to the user world.
 
 ### `parser.parse(title: string): { ... }`
 
-```javascript
+```python
 import { parser } from 'ohys-api'
 
 parser('[PROVIDER] Title 2nd season - 2 END (CH 1920x1080 x264 AAC)')
