@@ -58,9 +58,6 @@ def get_leading_numeric(text: str, i: int) -> tuple[int | float, int]:
     return int(kind) if kind.isnumeric() else nan, i
 
 
-get_leading_numeric("12", 0)
-
-
 def get_literal_position(text: str, i: int, match: str) -> tuple[str, int]:
     buffer = ""
 
