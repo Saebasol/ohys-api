@@ -1,6 +1,6 @@
 from contextlib import suppress
 from dataclasses import dataclass, field
-from math import nan
+from math import nan, isnan
 from typing import Final
 
 
@@ -21,7 +21,7 @@ class Codec:
 class File:
     name: str = ""
     resolution: str = ""
-    codec: Codec = Codec()
+    codec: Codec = field(default_factory=Codec)
 
 
 @dataclass
@@ -31,10 +31,10 @@ class Provider:
 
 @dataclass
 class Objet:
-    title: Title = Title()
-    file: File = File()
-    provider: Provider = Provider()
-    episodes: list[int] = field(default_factory=list)
+    title: Title = field(default_factory=Title)
+    file: File = field(default_factory=File)
+    provider: Provider = field(default_factory=Provider)
+    episodes: list[int | float] = field(default_factory=list)
     seasons: list[int] = field(default_factory=list)
 
 
@@ -55,7 +55,16 @@ def get_leading_numeric(text: str, i: int) -> tuple[int | float, int]:
             kind += text[i]
             i += 1
 
-    return int(kind) if kind.isnumeric() else nan, i
+    # Fuck js number
+    if kind.isnumeric():
+        kind = int(kind)
+    else:
+        try:
+            kind = float(kind)
+        except ValueError:
+            kind = nan
+
+    return kind, i
 
 
 def get_literal_position(text: str, i: int, match: str) -> tuple[str, int]:
@@ -106,14 +115,14 @@ def parse(text: str) -> Objet:
                     i += 1
                     continue
 
-                assert isinstance(following, int)
+                assert isinstance(following, int)  # must be int
 
                 objet.title.series = objet.title.series[0:-1]
                 objet.episodes = [kind + i for i in range(following - kind + 1)]
                 buffer = ""
                 i = next
             elif low[i - 1] != " ":
-                # It's not type of episode number or series namess
+                # It's not type of episode number or series name
                 buffer += text[i]
                 i += 1
                 continue
@@ -129,25 +138,25 @@ def parse(text: str) -> Objet:
             if is_numeric(low[expect]):
                 # Should be episode number
                 kind, next = get_leading_numeric(low, expect)
-                assert isinstance(kind, int)
                 objet.episodes = [kind]
                 i = next
             elif low.find("-", i) >= 0:
                 # Should be series name
                 series, next = get_literal_position(text, i, "-")
-                objet.title.series = series.strip()
+                objet.title.series += series.strip()
                 # Make sure that the hyphen to be matched in next loop
                 i = next - 1
             elif low.find("(", i) >= 0:
                 # Should be series name
                 series, next = get_literal_position(text, i, "(")
-                objet.title.series = series.strip()
+                objet.title.series += series.strip()
                 # Make sure that the hyphen to be matched in next loop
                 i = next - 1
         elif low[i] == "(":
             # Fallback if there was no hyphen during loop
             objet.title.seasonal = objet.title.seasonal or objet.title.original + buffer
             objet.title.original = objet.title.original or objet.title.seasonal
+
             # Skip initial
             i += 1
 
@@ -170,7 +179,7 @@ def parse(text: str) -> Objet:
         elif low[i] == "s":
             # Check if SNEN style available
             kind, next = get_leading_numeric(low, i + 1)
-            if isinstance(kind, float) or is_alphabet(low[i - 1]):
+            if isnan(kind) or is_alphabet(low[i - 1]):
                 buffer += text[i]
                 i += 1
                 continue
@@ -179,6 +188,7 @@ def parse(text: str) -> Objet:
             objet.title.seasonal = objet.title.seasonal or buffer + text[i] + str(kind)
 
             # Put seasonal data
+            assert isinstance(kind, int)  # must be int
             objet.seasons.append(kind)
             buffer = ""
             i = next
@@ -186,7 +196,7 @@ def parse(text: str) -> Objet:
         elif low[i] == "e":
             # Check if SNEN style available
             kind, next = get_leading_numeric(low, i + 1)
-            if isinstance(kind, float):
+            if isnan(kind):
                 buffer += text[i]
                 i += 1
                 continue
@@ -200,19 +210,15 @@ def parse(text: str) -> Objet:
             # Think about the case of: 1st, 2nd, 3rd, and Nth season
             if is_numeric(low[i]):
                 ordinal = ["st", "nd", "rd", "th"]
-                kind, unit_from = get_leading_numeric(low, i)
 
+                kind, unit_from = get_leading_numeric(low, i)
                 unit = low[unit_from : unit_from + 2]
 
-                # Handle NaN
-                if isinstance(kind, float):
-                    i += 1
-                    continue
+                assert isinstance(kind, int)  # must be int
 
-                if unit in ordinal and ["st", "nd", "rd", "th"].index(unit) >= 0:
+                if unit in ordinal and ordinal.index(unit) >= 0:
                     # Fill out the seasonal information and the title
                     objet.title.original = objet.title.original or buffer
-                    assert isinstance(kind, int)
                     objet.seasons = [kind]
                     buffer = str(kind) + unit
                     i = unit_from + 2
@@ -220,7 +226,6 @@ def parse(text: str) -> Objet:
                     # Heuristically guess seasonal information
                     # If text[i + 2] is not alphabet, I suppose text[i + 2] is space or hyphen
                     objet.title.original = objet.title.original or buffer
-                    assert isinstance(kind, int)
                     objet.seasons = [kind]
                     buffer = str(kind)
                     i = unit_from
