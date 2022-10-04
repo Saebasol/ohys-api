@@ -6,27 +6,27 @@ from typing import Final
 
 @dataclass
 class Title:
-    original: str = ""
-    seasonal: str = ""
-    series: str = ""
+    original: str = field(default_factory=str)
+    seasonal: str = field(default_factory=str)
+    series: str = field(default_factory=str)
 
 
 @dataclass
 class Codec:
-    video: str = ""
-    audio: str = ""
+    video: str = field(default_factory=str)
+    audio: str = field(default_factory=str)
 
 
 @dataclass
 class File:
-    name: str = ""
-    resolution: str = ""
+    name: str = field(default_factory=str)
+    resolution: str = field(default_factory=str)
     codec: Codec = field(default_factory=Codec)
 
 
 @dataclass
 class Provider:
-    channel: str = ""
+    channel: str = field(default_factory=str)
 
 
 @dataclass
